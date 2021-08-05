@@ -121,7 +121,7 @@ def build_staging_log_data_frame(
     return spark_session.read.json(
         path=log_data_set_s3_path,
         schema=log_data_set_schema
-    )
+    ).where(col('page') == 'NextSong')
 
 
 def build_user_data_frame(
