@@ -32,6 +32,12 @@ class DataLakeConfig:
 
 
 def read_config() -> DataLakeConfig:
+    """
+    Read raw config from 'dl.cfg' file and construct config data object to hold their values.
+
+    Returns:
+        data_lake_config (DataLakeConfig): config data object
+    """
     config_parser = configparser.ConfigParser()
     config_parser.read('dl.cfg')
 
@@ -59,6 +65,12 @@ def read_config() -> DataLakeConfig:
 
 
 def create_spark_session() -> SparkSession:
+    """
+    Create or retrieve current `SparkSession` instance with `hadoop-aws` dependency.
+
+    Returns:
+        spark_session (pyspark.sql.SparkSession): newly created or current Spark session
+    """
     return SparkSession \
         .builder \
         .config('spark.jars.packages', 'org.apache.hadoop:hadoop-aws:2.7.0') \
@@ -69,6 +81,16 @@ def build_staging_song_data_frame(
         spark_session: SparkSession,
         song_data_set_s3_path: str
 ) -> DataFrame:
+    """
+    Read JSON files to construct staging song data frame
+
+    Parameters:
+        spark_session (pyspark.sql.SparkSession): -
+        song_data_set_s3_path (str): S3 path to staging song data set
+
+    Returns:
+        staging_song_df (pyspark.sql.DataFrame): staging song data frame
+    """
     song_data_set_schema: pst.StructType = pst.StructType([
         pst.StructField('num_songs', pst.IntegerType()),
         pst.StructField('artist_id', pst.StringType()),
@@ -92,6 +114,16 @@ def build_staging_log_data_frame(
         spark_session: SparkSession,
         log_data_set_s3_path: str
 ) -> DataFrame:
+    """
+    Read JSON files to construct staging log data frame
+
+    Parameters:
+        spark_session (pyspark.sql.SparkSession): -
+        log_data_set_s3_path (str): S3 path to staging log data set
+
+    Returns:
+        staging_song_df (pyspark.sql.DataFrame): staging log data frame
+    """
     log_data_set_schema: pst.StructType = pst.StructType([
         pst.StructField('artist', pst.StringType()),
         pst.StructField('auth', pst.StringType()),
@@ -127,6 +159,15 @@ def build_staging_log_data_frame(
 def build_user_data_frame(
         staging_log_df: DataFrame
 ) -> DataFrame:
+    """
+    Construct user data frame from staging log data frame
+
+    Parameters:
+        staging_log_df (pyspark.sql.DataFrame): staging log data frame
+
+    Returns:
+        user_df (pyspark.sql.DataFrame): user data frame
+    """
     target_columns = [
         col('userId').alias('user_id'),
         col('firstName').alias('first_name'),
@@ -143,6 +184,15 @@ def build_user_data_frame(
 def build_artist_data_frame(
         staging_song_df: DataFrame
 ) -> DataFrame:
+    """
+    Construct artist data frame from staging song data frame
+
+    Parameters:
+        staging_song_df (pyspark.sql.DataFrame): staging song data frame
+
+    Returns:
+        artist_df (pyspark.sql.DataFrame): artist data frame
+    """
     target_columns = [
         col('artist_id'),
         col('artist_name').alias('name'),
@@ -157,6 +207,15 @@ def build_artist_data_frame(
 
 
 def cast_epoch_in_milliseconds_to_timestamp(value) -> Optional[datetime]:
+    """
+    Convert raw value to `datetime.datetime` instance.
+
+    Parameters:
+        value: value in particular column and row
+
+    Returns:
+        timestamp (datetime.datetime): -
+    """
     if type(value) == int or type(value) == float:
         return datetime.fromtimestamp(value / 1000)
     else:
@@ -172,6 +231,15 @@ cast_epoch_in_milliseconds_to_timestamp_udf = udf(
 def build_time_data_frame(
         staging_log_df: DataFrame
 ) -> DataFrame:
+    """
+    Construct time data frame from staging log data frame
+
+    Parameters:
+        staging_log_df (pyspark.sql.DataFrame): staging log data frame
+
+    Returns:
+        time_df (pyspark.sql.DataFrame): time data frame
+    """
     target_columns = [
         col('start_time'),
         hour(col('start_time')).alias('hour'),
@@ -192,6 +260,15 @@ def build_time_data_frame(
 def build_song_data_frame(
         staging_song_df: DataFrame
 ) -> DataFrame:
+    """
+    Construct song data frame from staging song data frame
+
+    Parameters:
+        staging_song_df (pyspark.sql.DataFrame): staging song data frame
+
+    Returns:
+        song_df (pyspark.sql.DataFrame): song data frame
+    """
     target_columns = [
         col('song_id'),
         col('title'),
@@ -213,6 +290,17 @@ def build_songplay_data_frame(
         song_df: DataFrame,
         artist_df: DataFrame
 ) -> DataFrame:
+    """
+    Construct songplay data frame from staging log, song, and artist data frames
+
+    Parameters:
+        staging_log_df (pyspark.sql.DataFrame): staging log data frame
+        song_df (pyspark.sql.DataFrame): song data frame
+        artist_df (pyspark.sql.DataFrame): artist data frame
+
+    Returns:
+        songplay_df (pyspark.sql.DataFrame): songplay data frame
+    """
     repartitioned_staging_log_df = staging_log_df \
         .withColumn('start_time', cast_epoch_in_milliseconds_to_timestamp_udf(staging_log_df['ts'])) \
         .withColumn('year', year(col('start_time'))) \
@@ -255,6 +343,16 @@ def write_user_data_frame_to_parquet(
         user_df: DataFrame,
         data_lake_config: DataLakeConfig
 ) -> None:
+    """
+    Write user data frame as Parquet files
+
+    Parameters:
+        user_df (pyspark.sql.DataFrame): user data frame
+        data_lake_config (DataLakeConfig): -
+
+    Returns:
+        None
+    """
     user_df.write.parquet(
         path=s3a_resource_format.format(
             bucket_name=data_lake_config.etl_processed_data_set.bucket_name,
@@ -268,6 +366,16 @@ def write_artist_data_frame_to_parquet(
         artist_df: DataFrame,
         data_lake_config: DataLakeConfig
 ) -> None:
+    """
+    Write artist data frame as Parquet files
+
+    Parameters:
+        artist_df (pyspark.sql.DataFrame): artist data frame
+        data_lake_config (DataLakeConfig): -
+
+    Returns:
+        None
+    """
     artist_df.write.parquet(
         path=s3a_resource_format.format(
             bucket_name=data_lake_config.etl_processed_data_set.bucket_name,
@@ -281,6 +389,16 @@ def write_time_data_frame_to_parquet(
         time_df: DataFrame,
         data_lake_config: DataLakeConfig
 ) -> None:
+    """
+    Write time data frame as Parquet files
+
+    Parameters:
+        time_df (pyspark.sql.DataFrame): time data frame
+        data_lake_config (DataLakeConfig): -
+
+    Returns:
+        None
+    """
     time_df.write.parquet(
         path=s3a_resource_format.format(
             bucket_name=data_lake_config.etl_processed_data_set.bucket_name,
@@ -295,6 +413,16 @@ def write_song_data_frame_to_parquet(
         song_df: DataFrame,
         data_lake_config: DataLakeConfig
 ) -> None:
+    """
+    Write song data frame as Parquet files
+
+    Parameters:
+        song_df (pyspark.sql.DataFrame): song data frame
+        data_lake_config (DataLakeConfig): -
+
+    Returns:
+        None
+    """
     song_df.write.parquet(
         path=s3a_resource_format.format(
             bucket_name=data_lake_config.etl_processed_data_set.bucket_name,
@@ -309,6 +437,16 @@ def write_songplay_data_frame_to_parquet(
         songplay_df: DataFrame,
         data_lake_config: DataLakeConfig
 ) -> None:
+    """
+    Write songplay data frame as Parquet files
+
+    Parameters:
+        songplay_df (pyspark.sql.DataFrame): songplay data frame
+        data_lake_config (DataLakeConfig): -
+
+    Returns:
+        None
+    """
     songplay_df.write.parquet(
         path=s3a_resource_format.format(
             bucket_name=data_lake_config.etl_processed_data_set.bucket_name,
