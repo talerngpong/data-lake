@@ -1,0 +1,5 @@
+venv
+dl.cfg
+.idea
+.vscode
+aws_stuff/common.sh
